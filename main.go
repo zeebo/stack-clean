@@ -66,7 +66,8 @@ func max(a, b int) int {
 }
 
 func minMax(ps []parsedStack) (minWait, maxWait int) {
-	for _, p := range ps {
+	minWait, maxWait = ps[0].waiting, ps[0].waiting
+	for _, p := range ps[1:] {
 		minWait = min(minWait, p.waiting)
 		maxWait = max(maxWait, p.waiting)
 	}
