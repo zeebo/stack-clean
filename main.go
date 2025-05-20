@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,12 +17,18 @@ import (
 )
 
 func main() {
+	printErrors := flag.Bool("e", false, "print errors")
+	flag.Parse()
+
 	var lines []string
 	var stacks []parsedStack
+	var errors int
 
 	addLines := func() {
 		if ps, err := parseStack(lines); err == nil {
 			stacks = append(stacks, ps)
+		} else {
+			errors++
 		}
 		lines = lines[:0]
 	}
@@ -49,6 +56,10 @@ func main() {
 		tw.Flush()
 		fmt.Println()
 	})
+
+	if *printErrors {
+		fmt.Printf("errors:%d\n", errors)
+	}
 }
 
 func min(a, b int) int {
