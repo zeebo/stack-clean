@@ -44,7 +44,7 @@ func main() {
 		fmt.Printf("count:%d waiting:%d-%d\n", n, minWait, maxWait)
 		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		for _, f := range ps[0].frames {
-			fmt.Fprintf(tw, "%s\t%s:%d\n", filepath.Base(f.path), f.fn, f.line)
+			fmt.Fprintf(tw, "%s:%d\t%s\n", filepath.Base(f.path), f.line, f.fn)
 		}
 		tw.Flush()
 		fmt.Println()
