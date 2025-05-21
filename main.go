@@ -18,6 +18,7 @@ import (
 
 func main() {
 	printErrors := flag.Bool("e", false, "print errors")
+	filterCount := flag.Int("c", 0, "remove stacks with count less than this")
 	flag.Parse()
 
 	var lines []string
@@ -47,6 +48,9 @@ func main() {
 	sort.Slice(stacks, func(i, j int) bool { return stacks[i].key < stacks[j].key })
 
 	group(stacks, func(n int, ps []parsedStack) {
+		if n < *filterCount {
+			return
+		}
 		minWait, maxWait := minMax(ps)
 		fmt.Printf("count:%d waiting:%d-%d\n", n, minWait, maxWait)
 		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
@@ -125,7 +129,7 @@ type parsedStack struct {
 }
 
 var (
-	goroutineMatcher = regexp.MustCompile(`^goroutine (\d+) \[(\w+)(, (\d+) minutes)?\]:$`)
+	goroutineMatcher = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(, (\d+) minutes)?\]:$`)
 	createdMatcher   = regexp.MustCompile(`^created by (.+) in goroutine (\d+)$`)
 	locationMatcher  = regexp.MustCompile(`^(.+):(\d+)( \+0x([0-9a-f]+))?$`)
 	functionMatcher  = regexp.MustCompile(`^(.+)\((.*)\)$`)
@@ -143,8 +147,12 @@ func parseStack(lines []string) (ps parsedStack, err error) {
 	ps.status = matches[2]
 	ps.waiting = p.digits(matches[4])
 
-	matches = p.regexp(lines[len(lines)-2], createdMatcher)
-	ps.created.fn = matches[1]
+	if lines[len(lines)-2] == "main.main()" {
+		ps.created.fn = "-"
+	} else {
+		matches = p.regexp(lines[len(lines)-2], createdMatcher)
+		ps.created.fn = matches[1]
+	}
 
 	matches = p.regexp(lines[len(lines)-1], locationMatcher)
 	ps.created.path = matches[1]
