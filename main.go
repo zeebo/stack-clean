@@ -26,7 +26,9 @@ func main() {
 	var errors int
 
 	addLines := func() {
-		if ps, err := parseStack(lines); err == nil {
+		if len(lines) == 0 {
+			return
+		} else if ps, err := parseStack(lines); err == nil {
 			stacks = append(stacks, ps)
 		} else {
 			errors++
@@ -40,6 +42,8 @@ func main() {
 		if line == "" {
 			addLines()
 			continue
+		} else if strings.HasPrefix(line, "goroutine ") {
+			addLines()
 		}
 		lines = append(lines, line)
 	}
