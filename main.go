@@ -52,7 +52,7 @@ func main() {
 			return
 		}
 		minWait, maxWait := minMax(ps)
-		fmt.Printf("count:%d waiting:%d-%d\n", n, minWait, maxWait)
+		fmt.Printf("count:%d waiting:%d-%d status:%s\n", n, minWait, maxWait, strings.Join(sortedStatuses(ps), ", "))
 		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		for _, f := range ps[0].frames {
 			fmt.Fprintf(tw, "%s:%d\t%s\n", filepath.Base(f.path), f.line, f.fn)
@@ -87,6 +87,19 @@ func minMax(ps []parsedStack) (minWait, maxWait int) {
 		maxWait = max(maxWait, p.waiting)
 	}
 	return minWait, maxWait
+}
+
+func sortedStatuses(ps []parsedStack) []string {
+	ss := make(map[string]struct{})
+	for _, p := range ps {
+		ss[p.status] = struct{}{}
+	}
+	statuses := make([]string, 0, len(ss))
+	for s := range ss {
+		statuses = append(statuses, s)
+	}
+	sort.Strings(statuses)
+	return statuses
 }
 
 func group(ps []parsedStack, cb func(n int, ps []parsedStack)) {
@@ -131,7 +144,7 @@ type parsedStack struct {
 var (
 	goroutineMatcher = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(, (\d+) minutes)?\]:$`)
 	createdMatcher   = regexp.MustCompile(`^created by (.+) in goroutine (\d+)$`)
-	locationMatcher  = regexp.MustCompile(`^(.+):(\d+)( \+0x([0-9a-f]+))?$`)
+	locationMatcher  = regexp.MustCompile(`^(.+):(\d+)( \+(0x[0-9a-f]+))?$`)
 	functionMatcher  = regexp.MustCompile(`^(.+)\((.*)\)$`)
 )
 
@@ -143,9 +156,9 @@ func parseStack(lines []string) (ps parsedStack, err error) {
 	var p parser
 
 	matches := p.regexp(lines[0], goroutineMatcher)
-	ps.goroutine = p.digits(matches[1])
+	ps.goroutine = int(p.digits(matches[1]))
 	ps.status = matches[2]
-	ps.waiting = p.digits(matches[4])
+	ps.waiting = int(p.digits(matches[4]))
 
 	if lines[len(lines)-2] == "main.main()" {
 		ps.created.fn = "-"
@@ -156,8 +169,8 @@ func parseStack(lines []string) (ps parsedStack, err error) {
 
 	matches = p.regexp(lines[len(lines)-1], locationMatcher)
 	ps.created.path = matches[1]
-	ps.created.line = p.digits(matches[2])
-	ps.created.offset = p.hex(matches[4])
+	ps.created.line = int(p.digits(matches[2]))
+	ps.created.offset = uintptr(p.digits(matches[4]))
 
 	for i := 1; i < len(lines)-2; i += 2 {
 		var f frame
@@ -168,8 +181,8 @@ func parseStack(lines []string) (ps parsedStack, err error) {
 
 		matches = p.regexp(lines[i+1], locationMatcher)
 		f.path = matches[1]
-		f.line = p.digits(matches[2])
-		f.offset = p.hex(matches[4])
+		f.line = int(p.digits(matches[2]))
+		f.offset = uintptr(p.digits(matches[4]))
 
 		ps.frames = append(ps.frames, f)
 	}
@@ -190,25 +203,14 @@ type parser struct {
 	err error
 }
 
-func (p *parser) digits(s string) (n int) {
+func (p *parser) digits(s string) (n uint64) {
 	if p.err != nil {
 		return 0
 	} else if s == "" {
 		return 0
 	}
-	n, p.err = strconv.Atoi(s)
+	n, p.err = strconv.ParseUint(s, 0, 64)
 	return n
-}
-
-func (p *parser) hex(s string) (_ uintptr) {
-	if p.err != nil {
-		return 0
-	} else if s == "" {
-		return 0
-	}
-	var n uint64
-	n, p.err = strconv.ParseUint(s, 16, 64)
-	return uintptr(n)
 }
 
 func (p *parser) regexp(s string, re *regexp.Regexp) (matches []string) {
